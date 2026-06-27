@@ -1,10 +1,15 @@
 const { Sequelize } = require("sequelize");
 // Crea proyectodb en el servidory configura las credenciales de tu bd de PostgreSQL
-const sequelize = new Sequelize("proyectodb", "postgres", "admin123", {
-  host: "localhost",
-  dialect: "postgres",
-  logging: false, // Evita que llene la consola con logs de consultas SQL básicas
-});
+const sequelize = new Sequelize(
+  process.env.DB_NAME, 
+  process.env.DB_USER, 
+  process.env.DB_PASSWORD, 
+  {
+    host: process.env.DB_HOST,
+    dialect: process.env.DB_DIALECT || "postgres",
+    logging: console.log, // Cambiado para ver qué SQL se ejecuta
+  }
+);
 // Probar y levantar la conexión
 sequelize.authenticate()
   .then(() => console.log("DB is connected to PostgreSQL"))

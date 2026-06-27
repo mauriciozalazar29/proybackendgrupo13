@@ -1,0 +1,37 @@
+const { DataTypes } = require("sequelize");
+const sequelize = require("../../config/database");
+const Mesa = require("./mesa.model");
+
+const Pedido = sequelize.define("Pedido", {
+  idPedido: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  estado: {
+    type: DataTypes.ENUM("PENDIENTE", "EN_COCINA", "LISTO_PARA_ENTREGA", "ENTREGADO", "PAGADO", "CANCELADO"),
+    defaultValue: "PENDIENTE",
+  },
+  tipoPedido: {
+    type: DataTypes.ENUM("LOCAL", "PARA_LLEVAR", "DELIVERY"),
+    allowNull: false,
+  },
+  fechaCreacion: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+  total: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0,
+  },
+}, {
+  tableName: "pedidos",
+  timestamps: false,
+});
+
+
+// pedido Mesa
+Pedido.belongsTo(Mesa, { foreignKey: "idMesa", as: "mesa" });
+Mesa.hasMany(Pedido, { foreignKey: "idMesa", as: "pedidos" });
+
+module.exports = Pedido;
