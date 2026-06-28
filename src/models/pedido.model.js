@@ -30,7 +30,7 @@ const Pedido = sequelize.define("Pedido", {
 });
 
 
-// pedido Mesa
+// pedido mesa
 Pedido.belongsTo(Mesa, { foreignKey: "idMesa", as: "mesa" });
 Mesa.hasMany(Pedido, { foreignKey: "idMesa", as: "pedidos" });
 

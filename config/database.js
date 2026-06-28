@@ -7,7 +7,6 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST,
     dialect: process.env.DB_DIALECT || "postgres",
-    logging: console.log, // Cambiado para ver qué SQL se ejecuta
   }
 );
 // Probar y levantar la conexión
