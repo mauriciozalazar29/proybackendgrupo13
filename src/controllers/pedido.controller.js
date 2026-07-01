@@ -11,7 +11,17 @@ const crearPedido = async (req, res) => {
 
   try {
     const nuevoPedido = await Pedido.create({ tipoPedido, idMesa });
-    res.status(201).json({ message: "Pedido creado correctamente", pedido: nuevoPedido });
+
+    // si es LOCAL y tiene mesa, la ocupa
+    if (tipoPedido === 'LOCAL' && idMesa) {
+      await Mesa.update({ estado: 'OCUPADA' }, { where: { idMesa: idMesa } });
+    }
+
+    const pedidoCreado = await Pedido.findByPk(nuevoPedido.idPedido, {
+      include: [{ model: Mesa, as: "mesa" }]
+    });
+
+    res.status(201).json({ message: "Pedido creado correctamente", pedido: pedidoCreado });
   } catch (error) {
     res.status(500).json({ message: "Error al crear pedido", error: error.message });
   }
@@ -20,7 +30,9 @@ const crearPedido = async (req, res) => {
 // obtenerPedidos 
 const obtenerPedidos = async (req, res) => {
   try {
-    const pedidos = await Pedido.findAll();
+    const pedidos = await Pedido.findAll({
+      include: [{ model: Mesa, as: "mesa" }],
+    });
     res.json(pedidos);
   } catch (error) {
     res.status(500).json({ message: "Error al obtener pedidos", error: error.message });
@@ -31,9 +43,10 @@ const obtenerPedidos = async (req, res) => {
 // obtenerPedidoPorId
 const obtenerPedidoPorId = async (req, res) => {
   try {
-    const pedido = await Pedido.findByPk(req.params.id);
+    const pedido = await Pedido.findByPk(req.params.id, {
+      include: [{ model: Mesa, as: "mesa" }],
+    });
     if (!pedido) return res.status(404).json({ message: "Pedido no encontrado" });
-    
     res.json(pedido);
   } catch (error) {
     res.status(500).json({ message: "Error al obtener el pedido", error: error.message });
@@ -54,6 +67,7 @@ const cambiarEstado = async (req, res) => {
 
     await pedido.update({ estado });
 
+    // Si se paga o se cancela, liberar la mesa
     if (["PAGADO", "CANCELADO"].includes(estado) && pedido.idMesa) {
       await Mesa.update({ estado: "LIBRE" }, { where: { idMesa: pedido.idMesa } });
     }
