@@ -54,7 +54,7 @@ const registrarPago = async (req, res) => {
               unit_price: Number(pedido.total || 0)
             }
           ],
-          external_reference: idPedido.toString(), // Clave para que MP nos devuelva el ID de nuestro pedido en el webhook
+          external_reference: idPedido.toString(),
           notification_url: `${process.env.NGROK_URL}/api/pagos/webhook`
         }
       });
@@ -75,14 +75,8 @@ const registrarPago = async (req, res) => {
       referenciaExterna
     }, { transaction: t });
 
-    // actualizar Estado Pedido y liberar mesa
+    // actualizar Estado Pedido (pero NO liberamos la mesa, eso se hace manual cuando el cliente se va)
     await pedido.update({ estado: "PAGADO" }, { transaction: t });
-    if (pedido.idMesa) {
-      await Mesa.update({ estado: "LIBRE" }, { 
-        where: { idMesa: pedido.idMesa },
-        transaction: t 
-      });
-    }
 
     await t.commit();
     res.status(201).json({ message: "Pago registrado correctamente", pago: nuevoPago });
@@ -93,22 +87,58 @@ const registrarPago = async (req, res) => {
   }
 };
 
-// webhook para recibir notificaciones de ercadoPago
+// webhook para recibir notificaciones de MercadoPago
 const recibirWebhookMP = async (req, res) => {
-  // para esta simulación manual le vamos a mandar el idPedido por el body
-  const { idPedido } = req.body;
 
-  if (!idPedido) {
-    return res.status(400).json({ message: "idPedido es requerido para simular el webhook" });
+  let paymentId = null;
+
+  // MP manda notificaciones de distintas formas (Webhooks en el body, o IPN en la URL)
+  if (req.body && req.body.action === "payment.created" && req.body.data && req.body.data.id) {
+    paymentId = req.body.data.id;
+  } else if (req.query && req.query.topic === "payment" && req.query.id) {
+    // Formato IPN detectado (es el que te está enviando MP)
+    paymentId = req.query.id;
+  } else if (req.body && req.body.type === "payment" && req.body.data && req.body.data.id) {
+    // Otra variante que a veces manda MP
+    paymentId = req.body.data.id;
+  } else if (req.body && req.body.idPedido) {
+    // Por las dudas, dejo el soporte para la simulación manual de tu compañero
+    paymentId = "SIMULACION";
+  }
+
+  // MercadoPago espera siempre un status 200 rápido, sino reintenta enviar el mensaje
+  if (!paymentId) {
+    return res.status(200).json({ message: "Evento ignorado (no es un pago nuevo o formato desconocido)" });
   }
 
   const t = await sequelize.transaction();
 
   try {
+    let idPedido;
+    let monto = 0;
+    
+    if (paymentId === "SIMULACION") {
+      idPedido = req.body.idPedido;
+    } else {
+      // Nos conectamos a MercadoPago 
+      const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
+      const payment = new Payment(client);
+      const paymentData = await payment.get({ id: paymentId });
+      
+      // external_reference guarda el idPedido original
+      idPedido = paymentData.external_reference;
+      monto = paymentData.transaction_amount;
+    }
+
+    if (!idPedido) {
+      await t.rollback();
+      return res.status(200).json({ message: "El pago no tiene idPedido asociado" });
+    }
+
     const pedido = await Pedido.findByPk(idPedido, { transaction: t });
     if (!pedido || pedido.estado === "PAGADO") {
       await t.rollback();
-      return res.status(400).json({ message: "Pedido no válido o ya pagado" });
+      return res.status(200).json({ message: "Pedido no válido o ya pagado" });
     }
 
     const cajaAbierta = await Caja.findOne({ where: { estado: "ABIERTA" }, transaction: t });
@@ -117,26 +147,24 @@ const recibirWebhookMP = async (req, res) => {
       return res.status(400).json({ message: "No hay caja abierta" });
     }
 
-    // registramos el pago simulando que vino de MercadoPago
+    if (paymentId === "SIMULACION") {
+        monto = pedido.total || 0;
+    }
+
+    // Guardamos el ingreso de plata en la Caja
     await Pago.create({
       idPedido: pedido.idPedido,
       idCaja: cajaAbierta.idCaja,
       metodoPago: "MERCADOPAGO",
-      monto: pedido.total || 0,
-      referenciaExterna: "simulacion_postman"
+      monto: monto,
+      referenciaExterna: paymentId.toString()
     }, { transaction: t });
 
-    // actualizamos pedido y liberamos mesa
+    // actualizamos pedido (la mesa queda OCUPADA hasta que el cliente se vaya físicamente)
     await pedido.update({ estado: "PAGADO" }, { transaction: t });
-    if (pedido.idMesa) {
-      await Mesa.update({ estado: "LIBRE" }, { 
-        where: { idMesa: pedido.idMesa },
-        transaction: t 
-      });
-    }
 
     await t.commit();
-    res.status(200).json({ message: "Webhook procesado con éxito. Pago registrado y mesa liberada." });
+    res.status(200).json({ message: "Webhook procesado con éxito. Pago registrado." });
 
   } catch (error) {
     await t.rollback();

@@ -3,19 +3,18 @@ const Mesa = require("../models/mesa.model");
 
 // crearPedido
 const crearPedido = async (req, res) => {
-  const { tipoPedido, idMesa } = req.body;
+  const { idMesa } = req.body;
   
-  if (!tipoPedido) {
-    return res.status(400).json({ message: "El campo tipoPedido es obligatorio (LOCAL, PARA_LLEVAR, DELIVERY)" });
+  if (!idMesa) {
+    return res.status(400).json({ message: "El idMesa es obligatorio para crear un pedido LOCAL." });
   }
 
   try {
-    const nuevoPedido = await Pedido.create({ tipoPedido, idMesa });
+    // Forzamos el tipoPedido a LOCAL
+    const nuevoPedido = await Pedido.create({ tipoPedido: 'LOCAL', idMesa });
 
-    // si es LOCAL y tiene mesa, la ocupa
-    if (tipoPedido === 'LOCAL' && idMesa) {
-      await Mesa.update({ estado: 'OCUPADA' }, { where: { idMesa: idMesa } });
-    }
+    // Siempre pasamos la mesa a OCUPADA
+    await Mesa.update({ estado: 'OCUPADA' }, { where: { idMesa: idMesa } });
 
     const pedidoCreado = await Pedido.findByPk(nuevoPedido.idPedido, {
       include: [{ model: Mesa, as: "mesa" }]

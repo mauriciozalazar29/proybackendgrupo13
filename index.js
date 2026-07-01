@@ -16,6 +16,7 @@ app.use('/api/detalles-pedidos', require('./src/routes/detallePedido.route'));
 app.use('/api/mesas', require('./src/routes/mesa.route'));
 app.use('/api/pagos', require('./src/routes/pago.route'));
 app.use('/api/caja', require('./src/routes/caja.route'));
+app.use('/api/reportes', require('./src/routes/reporte.route'));
 
 //setting
 app.set('port', process.env.PORT || 3000);
