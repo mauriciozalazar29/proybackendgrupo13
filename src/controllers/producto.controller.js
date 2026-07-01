@@ -2,14 +2,26 @@ const Producto = require("../models/producto.model");
 
 // crearProducto
 const crearProducto = async (req, res) => {
-  const { nombre, precio, categoria } = req.body;
+  const { nombre, categoria, precioCosto, porcentajeGanancia, descripcion, imagenUrl } = req.body;
 
-  if (!nombre || precio == null || !categoria) {
-    return res.status(400).json({ message: "Los campos nombre, precio y categoria son obligatorios" });
+  if (!nombre || !categoria || precioCosto == null || porcentajeGanancia == null) {
+    return res.status(400).json({ message: "Los campos nombre, categoria, precioCosto y porcentajeGanancia son obligatorios" });
   }
 
   try {
-    const nuevoProducto = await Producto.create(req.body);
+    // El controller calcula el precio de venta a partir del costo y el porcentaje
+    const precio = precioCosto + (precioCosto * porcentajeGanancia / 100);
+
+    const nuevoProducto = await Producto.create({
+      nombre,
+      descripcion,
+      imagenUrl,
+      categoria,
+      precioCosto,
+      porcentajeGanancia,
+      precio,
+    });
+
     res.status(201).json({ message: "Producto creado correctamente", producto: nuevoProducto });
   } catch (error) {
     res.status(500).json({ message: "Error al crear producto", error: error.message });
@@ -41,11 +53,20 @@ const obtenerProductoPorId = async (req, res) => {
   }
 };
 
-// actualizarProducto
+// actualizarProducto — recalcula el precio si cambia el costo o el porcentaje
 const actualizarProducto = async (req, res) => {
   try {
     const producto = await Producto.findByPk(req.params.id);
     if (!producto) return res.status(404).json({ message: "Producto no encontrado" });
+
+    const { precioCosto, porcentajeGanancia } = req.body;
+
+    // Si viene costo o porcentaje nuevo, recalcula el precio
+    if (precioCosto != null || porcentajeGanancia != null) {
+      const costo = precioCosto ?? producto.precioCosto;
+      const porcentaje = porcentajeGanancia ?? producto.porcentajeGanancia;
+      req.body.precio = costo + (costo * porcentaje / 100);
+    }
 
     await producto.update(req.body);
     res.json({ message: "Producto actualizado correctamente", producto });

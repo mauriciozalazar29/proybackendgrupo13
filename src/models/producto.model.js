@@ -22,10 +22,23 @@ const Producto = sequelize.define("Producto", {
   },
   descripcion: {
     type: DataTypes.STRING,
+    allowNull: true,
+  },
+  precioCosto: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  porcentajeGanancia: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
   },
   precio: {
     type: DataTypes.FLOAT,
     allowNull: false,
+  },
+  imagenUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   categoria: {
     type: DataTypes.ENUM("entrada", "plato_principal", "bebida", "postre"),
