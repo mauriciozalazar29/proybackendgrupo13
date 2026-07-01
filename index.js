@@ -20,7 +20,7 @@ app.set('port', process.env.PORT || 3000);
 
 // Sincronizar Base de Datos y arrancar el servidor
 //.sync() con alter: true actualiza las tablas si hubo cambios en los modelos
-sequelize.sync({ alter: true })
+sequelize.sync({ force: true })
   .then(() => {
     console.log("Tablas de PostgreSQL sincronizadas");
     app.listen(app.get("port"), () => {
@@ -33,3 +33,5 @@ sequelize.sync({ alter: true })
       err,
     );
   });
+
+  
